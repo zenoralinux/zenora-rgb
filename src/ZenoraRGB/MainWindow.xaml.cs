@@ -19,7 +19,7 @@ public partial class MainWindow : Window
         DeviceCombo.ItemsSource = _devices;
         HexColorText.Text = "#8B75FF";
         DeviceCombo.IsEnabled = false;
-        Log("Zenora RGB 0.2.0 started.");
+        Log("Zenora RGB 0.3.0 started.");
         Log("The app uses OpenRGB for vendor-independent device control.");
     }
 
@@ -38,7 +38,7 @@ public partial class MainWindow : Window
 
         SetBusy(true);
         StatusText.Text = "Preparing engine...";
-        EngineText.Text = "Checking the runtime and starting the local OpenRGB control service.";
+        EngineText.Text = "Preparing the embedded drivers and native engine. No runtime downloads are required.";
 
         try
         {
@@ -46,7 +46,7 @@ public partial class MainWindow : Window
             SetDevices(devices);
             StatusText.Text = "Connected";
             EngineText.Text = $"OpenRGB {OpenRgbRuntimeInstaller.OpenRgbVersion} is running. Hardware scan completed.";
-            DriverText.Text = "PawnIO setup was checked automatically. Some devices may need a Windows restart.";
+            DriverText.Text = "Embedded PawnIO and Microsoft Visual C++ setup completed. A Windows restart may be required.";
             Log($"Scan completed. OpenRGB reported {devices.Count} controller(s).");
 
             if (devices.Count == 0)
@@ -65,7 +65,7 @@ public partial class MainWindow : Window
             Log($"Connection failed: {ex.Message}");
             MessageBox.Show(
                 ex.Message + Environment.NewLine + Environment.NewLine +
-                "Check your internet connection to GitHub, then try again. If PawnIO was installed, a Windows restart may be required.",
+                "Verify that you are using the complete v0.3.0 EXE. Check Windows permissions and free disk space. If PawnIO was installed, restart Windows and try again.",
                 "Zenora RGB", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
