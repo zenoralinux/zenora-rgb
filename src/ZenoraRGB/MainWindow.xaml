@@ -33,7 +33,7 @@
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,5">
                     <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,14"/>
                     <TextBlock Text="ZENORA LINUX PROJECT" FontSize="9" Foreground="{StaticResource MutedBrush}"/>
-                    <TextBlock Text="v0.2.0 · Windows x64" FontSize="10" Foreground="#718097" Margin="0,5,0,0"/>
+                    <TextBlock Text="v0.3.0 · Offline bundle · Windows x64" FontSize="10" Foreground="#718097" Margin="0,5,0,0"/>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -51,7 +51,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Text="Lighting Studio" FontSize="28" FontWeight="Bold"/>
-                    <TextBlock Text="A single independent engine. No Armoury Crate or MSI Center required." FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>
+                    <TextBlock Text="One offline package. No Armoury Crate, MSI Center or internet connection required after download." FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>
                 </StackPanel>
                 <Border Grid.Column="1" Background="#1B2638" BorderBrush="#34435A" BorderThickness="1" CornerRadius="10" Padding="12,9" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
@@ -68,8 +68,8 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock Text="ZENORA RGB ENGINE" Foreground="#A9B3C6" FontSize="10" FontWeight="Bold"/>
-                        <TextBlock x:Name="EngineText" Text="OpenRGB runtime will be installed automatically on first connection." FontSize="13" Foreground="#E4E8F1" Margin="0,7,0,0" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="DriverText" Text="Hardware driver: will be checked and installed automatically when required." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="EngineText" Text="All native prerequisites are embedded in this EXE and will be prepared locally." FontSize="13" Foreground="#E4E8F1" Margin="0,7,0,0" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DriverText" Text="PawnIO and Microsoft Visual C++ are bundled; Windows UAC approval is required for driver installation." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Button x:Name="ConnectButton" Grid.Column="1" Content="Connect and scan" Background="{StaticResource AccentBrush}" BorderBrush="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="18,0,0,0" Click="ConnectButton_Click"/>
                 </Grid>
@@ -138,7 +138,7 @@
                         </WrapPanel>
                         <Button Content="Apply to all detected devices" HorizontalAlignment="Stretch" Background="{StaticResource AccentBrush}" BorderBrush="{StaticResource AccentBrush}" Margin="0,18,0,0" Click="ApplyAllButton_Click"/>
                         <TextBlock Text="ADVANCED NOTES" FontSize="9" Foreground="{StaticResource MutedBrush}" Margin="0,23,0,8"/>
-                        <TextBlock Text="Some RAM and motherboard controllers need PawnIO. Zenora RGB installs it from its official source when needed. Windows may ask for administrator approval or a restart." FontSize="10" Foreground="#AAB5C8" TextWrapping="Wrap" LineHeight="16"/>
+                        <TextBlock Text="OpenRGB, PawnIO and the Visual C++ runtime are embedded in this single EXE. Setup is offline; Windows may request UAC approval or a restart." FontSize="10" Foreground="#AAB5C8" TextWrapping="Wrap" LineHeight="16"/>
                     </StackPanel>
                 </Border>
             </Grid>

@@ -7,3 +7,5 @@ artifacts/
 *.user
 *.suo
 *.tmp
+bundle/
+third-party-sources/
