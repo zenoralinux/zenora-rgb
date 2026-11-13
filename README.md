@@ -16,8 +16,8 @@ Zenora RGB is a Windows x64 desktop app that controls compatible RGB hardware th
 
 1. Download and run ZenoraRGB.exe from the latest Zenora RGB GitHub Release.
 2. Approve the Windows administrator prompt. The app needs this permission to install the hardware-access driver and communicate with some motherboard/RAM controllers.
-3. Click Connect and scan. OpenRGB is downloaded and prepared automatically; PawnIO is checked/installed when needed.
-4. Select a detected controller, choose a color, then apply it to the selected controller or all detected controllers.
+3. Zenora RGB automatically downloads and prepares OpenRGB, checks/installs PawnIO when needed, starts the local engine, and scans your devices.
+4. Select a detected controller, choose a color, then apply it to the selected controller or all detected controllers. The Connect and scan button remains available for another scan.
 
 No manual SDK selection or vendor RGB software installation is required. A Windows restart may be needed after PawnIO installation.
 
