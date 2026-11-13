@@ -1,9 +1,7 @@
-using System.IO;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using Microsoft.Win32;
 using ZenoraRGB.Models;
 using ZenoraRGB.Services;
 
@@ -11,232 +9,173 @@ namespace ZenoraRGB;
 
 public partial class MainWindow : Window
 {
-    private readonly AsusAuraService _asus = new();
-    private readonly MsiMysticLightService _msi = new();
-    private readonly AppSettings _settings = AppSettings.Load();
-    private readonly ObservableCollection<RgbDevice> _msiDevices = new();
+    private readonly OpenRgbService _engine = new();
+    private readonly ObservableCollection<OpenRgbDevice> _devices = new();
+    private bool _busy;
 
     public MainWindow()
     {
         InitializeComponent();
-        MsiZoneCombo.ItemsSource = _msiDevices;
-        MsiSdkPathText.Text = string.IsNullOrWhiteSpace(_settings.MsiSdkPath)
-            ? "Not configured"
-            : _settings.MsiSdkPath;
+        DeviceCombo.ItemsSource = _devices;
         HexColorText.Text = "#8B75FF";
-        Log("Zenora RGB started. Hardware access stays on this PC.");
+        DeviceCombo.IsEnabled = false;
+        Log("Zenora RGB 0.2.0 started.");
+        Log("The app uses OpenRGB for vendor-independent device control.");
     }
 
-    private void ScanButton_Click(object sender, RoutedEventArgs e)
+    private async void ConnectButton_Click(object sender, RoutedEventArgs e) =>
+        await ConnectAndScanAsync();
+
+    private async Task ConnectAndScanAsync()
     {
-        Log("Checking vendor SDK availability...");
-        var auraType = Type.GetTypeFromProgID("aura.sdk.1", throwOnError: false);
-        AsusStatusText.Text = auraType is null ? "Aura SDK not detected" : "Aura SDK registered";
-        AsusDeviceText.Text = auraType is null
-            ? "Install or repair ASUS Armoury Crate / Lighting Service."
-            : "Aura SDK COM component is registered. Connect to enumerate devices.";
+        if (_busy) return;
 
-        MsiStatusText.Text = !string.IsNullOrWhiteSpace(_settings.MsiSdkPath) && File.Exists(_settings.MsiSdkPath)
-            ? "MSI SDK DLL configured"
-            : "SDK not selected";
-        MsiDeviceText.Text = "MSI Center / Mystic Light must also be installed.";
-        Log("Scan complete. Vendor SDK status refreshed.");
-    }
-
-    private void ConnectAsusButton_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var devices = _asus.Connect();
-            AsusStatusText.Text = $"Connected · {devices.Count} device(s)";
-            AsusDeviceText.Text = string.Join(" · ", devices.Select(d => d.Details));
-            Log($"ASUS Aura connected. Found {devices.Count} device(s).");
-        }
-        catch (Exception ex)
-        {
-            AsusStatusText.Text = "Connection unavailable";
-            AsusDeviceText.Text = ex.Message;
-            Log($"ASUS: {ex.Message}");
-        }
-    }
-
-    private void ReleaseAsusButton_Click(object sender, RoutedEventArgs e)
-    {
-        _asus.Release();
-        AsusStatusText.Text = "Released";
-        AsusDeviceText.Text = "Control returned to ASUS lighting software.";
-        Log("ASUS Aura control released.");
-    }
-
-    private void SelectMsiSdkButton_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Select the official MSI Mystic Light SDK x64 DLL",
-            Filter = "MSI Mystic Light SDK (MysticLight_SDK_x64.dll)|MysticLight_SDK_x64.dll|DLL files (*.dll)|*.dll",
-            CheckFileExists = true
-        };
-
-        if (dialog.ShowDialog(this) != true)
-            return;
-
-        _settings.MsiSdkPath = dialog.FileName;
-        _settings.Save();
-        MsiSdkPathText.Text = dialog.FileName;
-        MsiStatusText.Text = "SDK DLL selected";
-        MsiDeviceText.Text = "Click Connect MSI to initialize the vendor SDK.";
-        Log("Saved MSI SDK DLL path.");
-    }
-
-    private async void DownloadMsiSdkButton_Click(object sender, RoutedEventArgs e)
-    {
-        var confirmation = MessageBox.Show(
-            "Zenora RGB will download the official Mystic Light SDK package directly from MSI and extract it into your local AppData folder.\n\nThe proprietary MSI files will not be uploaded to Zenora's GitHub repository or included in the public release. MSI Center / Mystic Light must still be installed. Continue?",
-            "Download official MSI SDK",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Information);
-
-        if (confirmation != MessageBoxResult.Yes)
-            return;
-
-        DownloadMsiSdkButton.IsEnabled = false;
-        MsiStatusText.Text = "Downloading from MSI...";
-        MsiDeviceText.Text = "Fetching the official SDK package and installing it locally.";
-        Log("Downloading MSI Mystic Light SDK directly from MSI...");
+        SetBusy(true);
+        StatusText.Text = "Preparing engine...";
+        EngineText.Text = "Checking the runtime and starting the local OpenRGB control service.";
 
         try
         {
-            var dllPath = await MsiSdkInstaller.DownloadAndExtractAsync();
-            _settings.MsiSdkPath = dllPath;
-            _settings.Save();
-            MsiSdkPathText.Text = dllPath;
-            MsiStatusText.Text = "SDK installed locally";
-            MsiDeviceText.Text = "Official MSI SDK is ready. Click Connect MSI.";
-            Log("Official MSI SDK downloaded and extracted locally.");
+            var devices = await _engine.ConnectAsync(Log);
+            SetDevices(devices);
+            StatusText.Text = "Connected";
+            EngineText.Text = $"OpenRGB {OpenRgbRuntimeInstaller.OpenRgbVersion} is running. Hardware scan completed.";
+            DriverText.Text = "PawnIO setup was checked automatically. Some devices may need a Windows restart.";
+            Log($"Scan completed. OpenRGB reported {devices.Count} controller(s).");
+
+            if (devices.Count == 0)
+            {
+                SelectedDeviceText.Text = "OpenRGB is running, but no compatible RGB controllers were detected.";
+                MessageBox.Show(
+                    "OpenRGB started successfully but did not detect any compatible RGB devices. Close other RGB-control utilities, check device compatibility, then scan again.",
+                    "No compatible devices found", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
         catch (Exception ex)
         {
-            MsiStatusText.Text = "SDK download failed";
-            MsiDeviceText.Text = ex.Message;
-            Log($"MSI SDK download: {ex.Message}");
-            var result = MessageBox.Show(
-                ex.Message + "\n\nOpen MSI's official developer download page to download it manually?",
-                "MSI SDK download failed",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-            if (result == MessageBoxResult.Yes)
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
-                    "https://www.msi.com/Landing/mystic-light-rgb-gaming-pc/download")
-                { UseShellExecute = true });
+            StatusText.Text = "Connection failed";
+            EngineText.Text = "The independent RGB engine could not be started.";
+            DriverText.Text = ex.Message;
+            Log($"Connection failed: {ex.Message}");
+            MessageBox.Show(
+                ex.Message + Environment.NewLine + Environment.NewLine +
+                "Check your internet connection to GitHub, then try again. If PawnIO was installed, a Windows restart may be required.",
+                "Zenora RGB", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
-            DownloadMsiSdkButton.IsEnabled = true;
+            SetBusy(false);
         }
     }
 
-    private void ConnectMsiButton_Click(object sender, RoutedEventArgs e)
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_busy) return;
+        if (!_engine.IsConnected)
+        {
+            await ConnectAndScanAsync();
+            return;
+        }
+
+        SetBusy(true);
         try
         {
-            if (string.IsNullOrWhiteSpace(_settings.MsiSdkPath))
-                throw new InvalidOperationException("Select MysticLight_SDK_x64.dll first. The official SDK is not bundled with this app.");
-
-            var devices = _msi.Connect(_settings.MsiSdkPath);
-            _msiDevices.Clear();
-            foreach (var device in devices)
-                _msiDevices.Add(device);
-
-            if (_msiDevices.Count > 0)
-                MsiZoneCombo.SelectedIndex = 0;
-
-            MsiStatusText.Text = $"Connected · {_msiDevices.Count} LED zone(s)";
-            MsiDeviceText.Text = "Select a zone or apply the color to all detected MSI zones.";
-            Log($"MSI Mystic Light connected. Found {_msiDevices.Count} LED zone(s).");
+            var devices = await _engine.RefreshAsync();
+            SetDevices(devices);
+            StatusText.Text = "Connected";
+            Log($"Hardware refreshed. Found {devices.Count} controller(s).");
         }
         catch (Exception ex)
         {
-            MsiStatusText.Text = "Connection unavailable";
-            MsiDeviceText.Text = ex.Message;
-            Log($"MSI: {ex.Message}");
+            StatusText.Text = "Refresh failed";
+            Log($"Refresh failed: {ex.Message}");
+            MessageBox.Show(ex.Message, "Hardware scan", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        finally { SetBusy(false); }
     }
 
-    private void ReleaseMsiButton_Click(object sender, RoutedEventArgs e)
+    private void SetDevices(IReadOnlyList<OpenRgbDevice> devices)
     {
-        _msi.Release();
-        _msiDevices.Clear();
-        MsiStatusText.Text = "Released";
-        MsiDeviceText.Text = "MSI SDK released.";
-        Log("MSI Mystic Light SDK released.");
+        var previousId = (DeviceCombo.SelectedItem as OpenRgbDevice)?.Id;
+        _devices.Clear();
+        foreach (var device in devices) _devices.Add(device);
+
+        var selectedIndex = previousId.HasValue
+            ? _devices.ToList().FindIndex(d => d.Id == previousId.Value)
+            : -1;
+        DeviceCombo.SelectedIndex = selectedIndex >= 0 ? selectedIndex : (_devices.Count > 0 ? 0 : -1);
+        DeviceCombo.IsEnabled = _devices.Count > 0;
+        DeviceCountText.Text = _devices.Count == 1
+            ? "1 RGB controller detected"
+            : $"{_devices.Count} RGB controllers detected";
+        UpdateSelectedDeviceDescription();
     }
 
-    private void ApplyAsusButton_Click(object sender, RoutedEventArgs e)
+    private void DeviceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        UpdateSelectedDeviceDescription();
+
+    private void UpdateSelectedDeviceDescription()
     {
+        if (SelectedDeviceText is null) return;
+        if (DeviceCombo.SelectedItem is not OpenRgbDevice device)
+        {
+            SelectedDeviceText.Text = "No controller selected.";
+            return;
+        }
+
+        SelectedDeviceText.Text =
+            $"{device.DisplayName}{Environment.NewLine}" +
+            $"LED count: {device.LedCount}{Environment.NewLine}" +
+            $"Zones: {device.ZoneCount}{Environment.NewLine}" +
+            $"OpenRGB controller ID: {device.Id}";
+    }
+
+    private async void ApplySelectedButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DeviceCombo.SelectedItem is not OpenRgbDevice device)
+        {
+            MessageBox.Show("Connect to the engine and select a device first.",
+                "No device selected", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (!TryGetRgb(out var red, out var green, out var blue)) return;
+
+        SetBusy(true);
         try
         {
-            var (red, green, blue) = GetSelectedRgb();
-            var count = _asus.ApplyColor(red, green, blue);
-            Log($"Applied #{red:X2}{green:X2}{blue:X2} to {count} ASUS Aura device(s).");
+            await _engine.ApplyToDeviceAsync(device, red, green, blue);
+            Log($"Applied #{red:X2}{green:X2}{blue:X2} to {device.DisplayName}.");
         }
         catch (Exception ex)
         {
-            Log($"ASUS apply failed: {ex.Message}");
-            MessageBox.Show(ex.Message, "ASUS Aura", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Log($"Color update failed: {ex.Message}");
+            MessageBox.Show(ex.Message, "Color update", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        finally { SetBusy(false); }
     }
 
-    private void ApplyMsiButton_Click(object sender, RoutedEventArgs e)
+    private async void ApplyAllButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_devices.Count == 0)
+        {
+            MessageBox.Show("Connect to the engine and scan for devices first.",
+                "No devices found", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (!TryGetRgb(out var red, out var green, out var blue)) return;
+
+        SetBusy(true);
         try
         {
-            if (MsiZoneCombo.SelectedItem is not RgbDevice selected)
-                throw new InvalidOperationException("Connect MSI and select an LED zone first.");
-
-            var (red, green, blue) = GetSelectedRgb();
-            var count = _msi.ApplyColor(red, green, blue, selected);
-            Log($"Applied color to {count} MSI zone(s): {selected.DisplayName}.");
+            var count = await _engine.ApplyToAllAsync(_devices, red, green, blue);
+            Log($"Applied #{red:X2}{green:X2}{blue:X2} to {count} controller(s).");
         }
         catch (Exception ex)
         {
-            Log($"MSI apply failed: {ex.Message}");
-            MessageBox.Show(ex.Message, "MSI Mystic Light", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Log($"Apply-all failed: {ex.Message}");
+            MessageBox.Show(ex.Message, "Apply color", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-    }
-
-    private void ApplyBothButton_Click(object sender, RoutedEventArgs e)
-    {
-        var (red, green, blue) = GetSelectedRgb();
-        var success = new List<string>();
-        var errors = new List<string>();
-
-        try
-        {
-            if (_asus.IsConnected)
-                success.Add($"ASUS: {_asus.ApplyColor(red, green, blue)} device(s)");
-            else
-                errors.Add("ASUS is not connected");
-        }
-        catch (Exception ex) { errors.Add($"ASUS: {ex.Message}"); }
-
-        try
-        {
-            if (_msi.IsConnected)
-                success.Add($"MSI: {_msi.ApplyColor(red, green, blue)} zone(s)");
-            else
-                errors.Add("MSI is not connected");
-        }
-        catch (Exception ex) { errors.Add($"MSI: {ex.Message}"); }
-
-        if (success.Count > 0)
-            Log($"Color applied ({string.Join(" · ", success)}).");
-
-        if (errors.Count > 0)
-        {
-            Log(string.Join(" | ", errors));
-            MessageBox.Show(string.Join(Environment.NewLine, errors), "Some devices were skipped",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-        }
+        finally { SetBusy(false); }
     }
 
     private void PresetButton_Click(object sender, RoutedEventArgs e)
@@ -247,47 +186,61 @@ public partial class MainWindow : Window
 
     private void HexColorText_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (ColorPreview is null || HexColorText is null)
-            return;
-
-        if (TryGetColor(out var color))
+        if (ColorPreview is null || HexColorText is null) return;
+        if (TryParseColor(HexColorText.Text, out var color))
             ColorPreview.Background = new SolidColorBrush(color);
     }
 
-    private (byte Red, byte Green, byte Blue) GetSelectedRgb()
+    private bool TryGetRgb(out byte red, out byte green, out byte blue)
     {
-        if (!TryGetColor(out var color))
-            throw new InvalidOperationException("Enter a valid HEX color such as #8B75FF.");
-
-        return (color.R, color.G, color.B);
+        if (!TryParseColor(HexColorText.Text, out var color))
+        {
+            MessageBox.Show("Enter a valid HEX color, for example #8B75FF.",
+                "Invalid color", MessageBoxButton.OK, MessageBoxImage.Warning);
+            red = green = blue = 0;
+            return false;
+        }
+        red = color.R;
+        green = color.G;
+        blue = color.B;
+        return true;
     }
 
-    private bool TryGetColor(out Color color)
+    private static bool TryParseColor(string? value, out Color color)
     {
         try
         {
-            var converted = ColorConverter.ConvertFromString(HexColorText.Text.Trim());
-            if (converted is Color parsed)
+            var result = ColorConverter.ConvertFromString(value?.Trim());
+            if (result is Color parsed)
             {
                 color = parsed;
                 return true;
             }
         }
-        catch { /* invalid input is handled by the caller */ }
-
+        catch { /* invalid HEX text */ }
         color = Colors.White;
         return false;
     }
 
-    private void Log(string message)
+    private void SetBusy(bool busy)
     {
-        var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
-        LogText.Text = string.IsNullOrWhiteSpace(LogText.Text) ? line : LogText.Text + Environment.NewLine + line;
+        _busy = busy;
+        ConnectButton.IsEnabled = !busy;
+        ConnectButton.Content = busy
+            ? "Please wait..."
+            : (_engine.IsConnected ? "Reconnect and scan" : "Connect and scan");
+        DeviceCombo.IsEnabled = !busy && _devices.Count > 0;
     }
 
-    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    private void Log(string message)
     {
-        _asus.Dispose();
-        _msi.Dispose();
+        if (LogText is null) return;
+        var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
+        LogText.Text = string.IsNullOrWhiteSpace(LogText.Text)
+            ? line
+            : LogText.Text + Environment.NewLine + line;
     }
+
+    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e) =>
+        _engine.Dispose();
 }

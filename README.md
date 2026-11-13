@@ -1,72 +1,71 @@
 # Zenora RGB
 
-A Windows x64 desktop prototype for controlling ASUS Aura and MSI Mystic Light from one interface.
+Zenora RGB is a Windows x64 desktop app that controls compatible RGB hardware through a single, vendor-independent OpenRGB engine.
 
-## Current prototype features
+## What changed in 0.2.0
 
-- ASUS Aura SDK discovery and static color control through the registered COM API.
-- MSI Mystic Light SDK discovery and static color control through the official x64 native SDK.
-- One-click download and local extraction of MSI's SDK from MSI's official download host.
-- One HEX color palette with quick presets.
-- Apply a color to all discovered ASUS devices, one selected MSI LED zone, or both connected vendor stacks.
-- Local settings for the MSI SDK path.
-- Self-contained .NET runtime in the single-file EXE. No separate .NET installation is required.
-- No Zenora account, telemetry, or cloud service.
+- One unified OpenRGB engine for supported ASUS, MSI, Corsair and other RGB controllers.
+- No Armoury Crate, ASUS Aura app, MSI Center, or Mystic Light installation is required.
+- First-run setup downloads OpenRGB 1.1 from the separate Zenora GitHub runtime release, verifies its SHA-256, and extracts it automatically.
+- When Windows hardware access requires PawnIO, the app downloads the setup from the official PawnIO GitHub release, verifies its SHA-256, and runs the installer silently.
+- Local OpenRGB SDK server is bound to 127.0.0.1 only; the app does not expose the control port to the network.
+- One HEX palette, presets, selected-device and all-device color application.
+- Self-contained .NET runtime. No separate .NET installation is required.
 
-## Vendor components
+## First run
 
-### ASUS
+1. Download and run ZenoraRGB.exe from the latest Zenora RGB GitHub Release.
+2. Approve the Windows administrator prompt. The app needs this permission to install the hardware-access driver and communicate with some motherboard/RAM controllers.
+3. Click Connect and scan. OpenRGB is downloaded and prepared automatically; PawnIO is checked/installed when needed.
+4. Select a detected controller, choose a color, then apply it to the selected controller or all detected controllers.
 
-Install Armoury Crate and the ASUS Lighting Service / Aura components for your motherboard. Zenora RGB looks for the registered Aura SDK COM ProgID `aura.sdk.1`. If the COM component is absent, repair the ASUS lighting components and reboot.
+No manual SDK selection or vendor RGB software installation is required. A Windows restart may be needed after PawnIO installation.
 
-ASUS developer references:
-- https://www.asus.com/campaign/aura/us/SDK.php
-- https://www.asus.com/campaign/aura/download/ASUS_Aura_SDK_FAQ.pdf
+## Runtime downloads and integrity
 
-ASUS Lighting Service / Aura SDK components remain vendor-installed prerequisites; ASUS binaries are not copied into Zenora RGB's public release.
+OpenRGB is an independent GPL-licensed upstream project. Zenora RGB rehosts the unmodified OpenRGB 1.1 Windows x64 portable archive in the separate runtime-v1.1 GitHub Release, alongside the corresponding upstream source archive and third-party notices. The app verifies the pinned SHA-256 before extraction.
 
-### MSI
+PawnIO is not redistributed by Zenora RGB. It is retrieved from the official upstream GitHub release and SHA-256-verified before the silent installer is launched.
 
-Install MSI Center and its Mystic Light component. In Zenora RGB, click **Download official SDK**. The app downloads the official MSI SDK archive directly from MSI and extracts it to:
+## Hardware compatibility
 
-`%LOCALAPPDATA%\ZenoraRGB\VendorSDK\MSI`
+OpenRGB supports a broad range of RGB controllers, but support is model- and controller-specific. A device can appear with limited control, or not be detected at all. OpenRGB's supported-device list and known issue tracker are the source of truth for compatibility.
 
-Then click **Connect MSI**. The SDK download is performed on the user's PC; the proprietary MSI SDK is not included in this repository or the GitHub Release.
+The known desktop configuration this project is being tested against includes:
+- ASUS PRIME Z790-P WiFi motherboard
+- Corsair Vengeance RGB memory (exact hardware revision not yet verified)
+- MSI GeForce RTX 3090 Suprim X
+- Lian Li O11 Dynamic EVO RGB case
 
-Official MSI developer page:
-https://www.msi.com/Landing/mystic-light-rgb-gaming-pc/download
+Detection and control of those exact components still require a real test on the target PC. The app must not be assumed to control a case, fan hub, or RGB strip merely because it is connected to the motherboard.
 
-The MSI SDK documentation marks the material Confidential. Zenora RGB therefore does not redistribute the SDK DLL. MSI's own Mystic Light application stack must still be installed.
+## Important Windows notes
 
-### If the automatic SDK download is unavailable
-
-Use **Choose DLL** after downloading the x64 package from MSI's official developer page. Select `MysticLight_SDK_x64.dll`.
+- The app requests administrator privileges at startup. Windows UAC approval cannot and should not be bypassed.
+- Some devices need PawnIO and/or a Windows restart before they can be accessed.
+- Close other RGB utilities before connecting. Competing services may hold exclusive access to a controller.
+- Do not install or operate multiple low-level RGB tools against the same controller at the same time.
+- The OpenRGB SDK endpoint is only bound to loopback (127.0.0.1) and is not intended for remote access.
 
 ## Build from source
 
 Install the .NET 10 SDK on Windows, then run:
 
-```powershell
-dotnet publish .\src\ZenoraRGB\ZenoraRGB.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o .\publish
-```
+    dotnet publish .\src\ZenoraRGB\ZenoraRGB.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o .\publish
 
-The output is `publish\ZenoraRGB.exe`.
+The output is publish\ZenoraRGB.exe.
 
-## GitHub Releases
+## Upstream projects
 
-Every successful push to `main` creates or refreshes the `v0.1.0` GitHub Release asset. Pushing a version tag such as `v0.2.0` creates a separately versioned release.
+- OpenRGB: https://codeberg.org/OpenRGB/OpenRGB
+- OpenRGB release 1.1: https://codeberg.org/OpenRGB/OpenRGB/releases/tag/release_1.1
+- PawnIO Setup: https://github.com/namazso/PawnIO.Setup
+- OpenRGB supported devices: https://openrgb.org/devices.html
 
-The release contains Zenora RGB only. Vendor SDKs are fetched from their original manufacturers on the user's machine, not rehosted by this project.
+## Scope
 
-## Scope and limitations of 0.1.0
-
-- This is a hardware-control prototype, not a full replacement for Armoury Crate or MSI Center.
-- ASUS control requires an installed and registered Aura SDK COM component. It enumerates Aura SDK devices and applies one static color to all their LEDs.
-- MSI control requires MSI's official 64-bit SDK and MSI Mystic Light application stack. It applies a static color to a selected LED area.
-- Animated effects, fan speed, temperature monitoring, Corsair/iCUE, and non-ASUS/MSI adapters are not implemented yet.
-- Device compatibility depends on the installed vendor service, SDK version, and exact hardware.
-- Do not run competing RGB controllers against the same device at the same time. Release control before handing a device back to the vendor application.
+This release provides static color control. Animated effects, per-zone mode editing, fan speed control, temperature monitoring, and per-device profiles are not implemented in Zenora RGB yet. Their availability depends on a future app release and upstream hardware support.
 
 ## Safety
 
-The app does not write directly to raw SMBus/I²C registers and does not install kernel drivers. Vendor SDKs are loaded only from vendor-installed components or the locally downloaded MSI SDK.
+The app does not copy or redistribute ASUS/MSI proprietary SDKs. It uses OpenRGB's supported controller drivers and PawnIO only when required. All downloaded runtime files are integrity-checked before use.
