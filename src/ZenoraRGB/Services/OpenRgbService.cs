@@ -20,21 +20,23 @@ public sealed class OpenRgbService : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        report?.Invoke("Preparing the OpenRGB runtime...");
-        var executable = await OpenRgbRuntimeInstaller.EnsureOpenRgbAsync(report, cancellationToken);
+        report?.Invoke("Preparing the prerequisites embedded in ZenoraRGB.exe...");
+        await OpenRgbRuntimeInstaller.EnsureVCRedistAsync(report, cancellationToken);
 
-        report?.Invoke("Checking the independent hardware-access driver...");
         try
         {
             var installCode = await OpenRgbRuntimeInstaller.InstallPawnIoAsync(report, cancellationToken);
             if (installCode == 3010)
-                report?.Invoke("A restart may be required for motherboard and RGB memory access.");
+                report?.Invoke("PawnIO was installed. Restart Windows before expecting RAM/SMBus access.");
         }
         catch (Exception ex)
         {
-            // OpenRGB can still control devices that do not need SMBus/PawnIO.
+            // Direct USB/PCIe controllers can still be available without PawnIO.
             report?.Invoke($"PawnIO is unavailable: {ex.Message} Direct USB/PCIe devices will still be scanned.");
         }
+
+        report?.Invoke("Preparing OpenRGB from the embedded package...");
+        var executable = await OpenRgbRuntimeInstaller.EnsureOpenRgbAsync(report, cancellationToken);
 
         if (!await TryConnectExistingServerAsync(cancellationToken))
         {
