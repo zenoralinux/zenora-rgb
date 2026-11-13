@@ -23,7 +23,7 @@ At runtime, the app verifies the embedded hashes again. Native packages are extr
 ## Third-party licensing
 
 - OpenRGB 1.1 is GPL-2.0-or-later. Its corresponding source archive is attached to the v0.3.0 Release.
-- PawnIO driver source is GPL-2.0-or-later with its upstream device-interface exception. Its corresponding 2.2.0 source archive is attached to the v0.3.0 Release. The official PawnIO Setup binary is embedded unchanged; the installer states it may be redistributed unmodified.
+- PawnIO driver source is GPL-2.0-or-later with its upstream device-interface exception. The 2.2.0 source archive and its pinned PawnPP submodule source (commit e64e4c37b2d8ba0d8ee57205faf8183aee12c438) are attached to the v0.3.0 Release. The official PawnIO Setup binary is embedded unchanged; the installer states it may be redistributed unmodified.
 - Microsoft Visual C++ v14 x64 Redistributable is obtained from Microsoft's official permanent download URL; packaging validates its Microsoft Authenticode signature and the final binary hash.
 - Third-party notices and the exact package hash manifest accompany the release and are also embedded in the EXE.
 
