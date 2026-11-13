@@ -41,6 +41,27 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Wait for OpenRGB runtime release
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $ready = $false
+          for ($attempt = 1; $attempt -le 60; $attempt++) {
+            $assets = gh release view "runtime-v1.1" --repo "$env:GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>$null
+            if ($LASTEXITCODE -eq 0 -and $assets -contains "OpenRGB_1.1_Windows_64_8e16de2.zip") {
+              $ready = $true
+              break
+            }
+            Start-Sleep -Seconds 10
+          }
+          if (-not $ready) {
+            throw "OpenRGB runtime-v1.1 release is not ready. The app release has been stopped."
+          }
+
       - name: Create or refresh v0.2.0 Release from main
         if: github.ref == 'refs/heads/main'
         env:
