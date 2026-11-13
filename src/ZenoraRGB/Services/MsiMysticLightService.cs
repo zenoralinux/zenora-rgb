@@ -109,7 +109,7 @@ public sealed class MsiMysticLightService : IDisposable
         if (!_initialized || _setLedColor is null)
             throw new InvalidOperationException("Connect to MSI Mystic Light before applying a color.");
 
-        var targets = selectedDevice is null
+        IEnumerable<RgbDevice> targets = selectedDevice is null
             ? Devices
             : new[] { selectedDevice };
 
