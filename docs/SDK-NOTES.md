@@ -8,9 +8,9 @@ No ASUS Aura COM SDK, MSI Mystic Light SDK, Armoury Crate, MSI Center, or Mystic
 
 ## Local SDK bridge
 
-The app starts the OpenRGB SDK server with a loopback-only listener at 127.0.0.1:6749, then uses the OpenRGB protocol v6 client implemented in OpenRgbSdkClient.cs. The listener is not exposed to the LAN.
+The app starts the OpenRGB SDK server with a loopback-only listener at 127.0.0.1:6742, then uses the OpenRGB protocol v6 client implemented in OpenRgbSdkClient.cs. The listener is not exposed to the LAN.
 
-The client negotiates protocol version 6, reads the controller list and controller descriptions, and submits direct RGBColor arrays using NET_PACKET_ID_RGBCONTROLLER_UPDATELEDS. Controller descriptions are parsed using the protocol-v6 fields (including alternate LED names, display name, configuration data, zone modes, and v6 segment metadata).
+The client negotiates protocol version 6, requests RGBController plus localhost-client flags, reads the controller count and stable unique controller IDs, loads each controller description by its unique ID, and submits RGBColor arrays using NET_PACKET_ID_RGBCONTROLLER_UPDATELEDS. Controller descriptions are parsed using the protocol-v6 fields (including alternate LED names, display name, configuration data, zone modes, and v6 segment metadata).
 
 The parser contains a compatibility retry for protocol-v6 zone color-order fields, because this field has appeared in protocol-v6 SDK documentation variants. Changes to the upstream SDK schema must be reviewed before moving OpenRGB to another major version.
 
