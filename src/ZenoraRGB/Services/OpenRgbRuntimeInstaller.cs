@@ -79,7 +79,7 @@ public static class OpenRgbRuntimeInstaller
             !string.Equals(await ComputeSha256Async(installerPath, cancellationToken),
                 PawnIoSha256, StringComparison.OrdinalIgnoreCase))
         {
-            report?.Invoke("Downloading the signed PawnIO hardware-access driver...");
+            report?.Invoke("Downloading the PawnIO hardware-access driver...");
             await DownloadVerifiedAsync(PawnIoUrl, installerPath, PawnIoSha256, cancellationToken);
         }
 
