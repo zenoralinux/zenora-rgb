@@ -204,11 +204,8 @@ public static class OpenRgbRuntimeInstaller
                 @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO");
 
             var displayVersion = uninstallKey?.GetValue("DisplayVersion") as string;
-            if (Version.TryParse(displayVersion, out var installedVersion) &&
-                installedVersion >= new Version(2, 2, 0))
-            {
-                return true;
-            }
+            if (Version.TryParse(displayVersion, out var installedVersion))
+                return installedVersion >= new Version(2, 2, 0);
 
             // PawnIO is registered by Windows as a kernel driver service.
             using var serviceKey = Registry.LocalMachine.OpenSubKey(
