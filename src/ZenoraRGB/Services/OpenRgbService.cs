@@ -118,7 +118,7 @@ public sealed class OpenRgbService : IDisposable
         var start = new ProcessStartInfo
         {
             FileName = executable,
-            Arguments = "--server --server-host 127.0.0.1 --server-port 6749 --noautoconnect --noautostart --loglevel 3",
+            Arguments = "--server --server-host 127.0.0.1 --server-port 6749",
             WorkingDirectory = Path.GetDirectoryName(executable)!,
             UseShellExecute = false,
             CreateNoWindow = true
