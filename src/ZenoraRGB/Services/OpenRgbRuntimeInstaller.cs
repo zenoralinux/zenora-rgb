@@ -36,36 +36,50 @@ public static class OpenRgbRuntimeInstaller
         CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(RootDirectory);
-        var executable = Directory.GetFiles(OpenRgbDirectory, "OpenRGB.exe", SearchOption.AllDirectories)
-            .FirstOrDefault();
-
+        var executable = FindOpenRgbExecutable(OpenRgbDirectory);
         if (executable is not null)
             return executable;
 
         report?.Invoke("Downloading the OpenRGB runtime from the Zenora GitHub release...");
         var archivePath = Path.Combine(RootDirectory, $"OpenRGB-{OpenRgbVersion}.zip");
+        var stagingDirectory = Path.Combine(RootDirectory, $"OpenRGB-{OpenRgbVersion}-{Guid.NewGuid():N}.staging");
 
         await DownloadVerifiedAsync(
             OpenRgbArchiveUrl, archivePath, OpenRgbSha256, cancellationToken);
 
         try
         {
-            SafeExtractZip(archivePath, OpenRgbDirectory);
+            SafeExtractZip(archivePath, stagingDirectory);
+            executable = FindOpenRgbExecutable(stagingDirectory);
+
+            if (executable is null)
+                throw new FileNotFoundException(
+                    "The OpenRGB runtime archive was downloaded, but OpenRGB.exe was not found.");
+
+            if (Directory.Exists(OpenRgbDirectory))
+                Directory.Delete(OpenRgbDirectory, recursive: true);
+
+            Directory.Move(stagingDirectory, OpenRgbDirectory);
+            executable = FindOpenRgbExecutable(OpenRgbDirectory)
+                ?? throw new FileNotFoundException("OpenRGB.exe disappeared after runtime extraction.");
+
+            report?.Invoke($"OpenRGB {OpenRgbVersion} is ready.");
+            return executable;
         }
         finally
         {
             TryDelete(archivePath);
+            TryDeleteDirectory(stagingDirectory);
         }
+    }
 
-        executable = Directory.GetFiles(OpenRgbDirectory, "OpenRGB.exe", SearchOption.AllDirectories)
+    private static string? FindOpenRgbExecutable(string directory)
+    {
+        if (!Directory.Exists(directory))
+            return null;
+
+        return Directory.GetFiles(directory, "OpenRGB.exe", SearchOption.AllDirectories)
             .FirstOrDefault();
-
-        if (executable is null)
-            throw new FileNotFoundException(
-                "The OpenRGB runtime archive was downloaded, but OpenRGB.exe was not found.");
-
-        report?.Invoke($"OpenRGB {OpenRgbVersion} is ready.");
-        return executable;
     }
 
     public static async Task<string> EnsurePawnIoInstallerAsync(
@@ -239,6 +253,12 @@ public static class OpenRgbRuntimeInstaller
     private static void TryDelete(string path)
     {
         try { if (File.Exists(path)) File.Delete(path); }
+        catch { /* best-effort cleanup */ }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try { if (Directory.Exists(path)) Directory.Delete(path, recursive: true); }
         catch { /* best-effort cleanup */ }
     }
 }
