@@ -1,3 +1,4 @@
+using System.IO;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -218,7 +219,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            var converted = new ColorConverter().ConvertFromString(HexColorText.Text.Trim());
+            var converted = ColorConverter.ConvertFromString(HexColorText.Text.Trim());
             if (converted is Color parsed)
             {
                 color = parsed;
