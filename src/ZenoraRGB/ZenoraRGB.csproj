@@ -12,4 +12,36 @@
     <RootNamespace>ZenoraRGB</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+
+  <!-- These binaries are downloaded and hash-verified by Prepare-Bundle.ps1,
+       then embedded as resources in the final self-contained single-file EXE. -->
+  <ItemGroup Condition="'$(OpenRgbRuntimePath)' != '' and Exists('$(OpenRgbRuntimePath)')">
+    <EmbeddedResource Include="$(OpenRgbRuntimePath)"
+                      LogicalName="ZenoraRGB.Resources.OpenRGB.zip" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PawnIoInstallerPath)' != '' and Exists('$(PawnIoInstallerPath)')">
+    <EmbeddedResource Include="$(PawnIoInstallerPath)"
+                      LogicalName="ZenoraRGB.Resources.PAWNIO_setup.exe" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(VcRedistPath)' != '' and Exists('$(VcRedistPath)')">
+    <EmbeddedResource Include="$(VcRedistPath)"
+                      LogicalName="ZenoraRGB.Resources.vc_redist.x64.exe" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(ThirdPartyNoticesPath)' != '' and Exists('$(ThirdPartyNoticesPath)')">
+    <EmbeddedResource Include="$(ThirdPartyNoticesPath)"
+                      LogicalName="ZenoraRGB.Resources.THIRD-PARTY-NOTICES.txt" />
+  </ItemGroup>
+
+  <Target Name="ValidateBundledPrerequisites"
+          BeforeTargets="PrepareResources"
+          Condition="'$(RequireBundledPrerequisites)' == 'true'">
+    <Error Condition="'$(OpenRgbRuntimePath)' == '' or !Exists('$(OpenRgbRuntimePath)')"
+           Text="OpenRGB runtime was not prepared. Run scripts/Prepare-Bundle.ps1." />
+    <Error Condition="'$(PawnIoInstallerPath)' == '' or !Exists('$(PawnIoInstallerPath)')"
+           Text="PawnIO installer was not prepared. Run scripts/Prepare-Bundle.ps1." />
+    <Error Condition="'$(VcRedistPath)' == '' or !Exists('$(VcRedistPath)')"
+           Text="Microsoft Visual C++ Redistributable was not prepared. Run scripts/Prepare-Bundle.ps1." />
+    <Error Condition="'$(ThirdPartyNoticesPath)' == '' or !Exists('$(ThirdPartyNoticesPath)')"
+           Text="Third-party notices were not prepared. Run scripts/Prepare-Bundle.ps1." />
+  </Target>
 </Project>
