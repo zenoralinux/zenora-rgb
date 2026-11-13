@@ -1,0 +1,50 @@
+name: Build Windows app
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish self-contained single-file EXE
+        shell: pwsh
+        run: |
+          dotnet publish ./src/ZenoraRGB/ZenoraRGB.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false --output ./publish
+          if (!(Test-Path ./publish/ZenoraRGB.exe)) {
+            throw "ZenoraRGB.exe was not produced."
+          }
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZenoraRGB-win-x64
+          path: ./publish/ZenoraRGB.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create "$env:GITHUB_REF_NAME" "./publish/ZenoraRGB.exe" --title "Zenora RGB $env:GITHUB_REF_NAME" --generate-notes
