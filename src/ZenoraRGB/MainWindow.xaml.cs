@@ -46,7 +46,7 @@ public partial class MainWindow : Window
             SetDevices(devices);
             StatusText.Text = "Connected";
             EngineText.Text = $"OpenRGB {OpenRgbRuntimeInstaller.OpenRgbVersion} is running. Hardware scan completed.";
-            DriverText.Text = "Embedded PawnIO and Microsoft Visual C++ setup completed. A Windows restart may be required.";
+            DriverText.Text = "Embedded prerequisites checked. Read the activity log for any driver warning or restart requirement.";
             Log($"Scan completed. OpenRGB reported {devices.Count} controller(s).");
 
             if (devices.Count == 0)
