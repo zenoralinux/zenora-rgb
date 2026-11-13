@@ -7,8 +7,8 @@ using ZenoraRGB.Models;
 namespace ZenoraRGB.Services;
 
 /// <summary>
-/// Minimal OpenRGB SDK v6 client. It speaks to the loopback-only OpenRGB
-/// server started by Zenora RGB and never exposes the SDK port to the LAN.
+/// Minimal OpenRGB SDK v6 client. It communicates with the local loopback-only
+/// OpenRGB server and never exposes the SDK port to the LAN.
 /// </summary>
 public sealed class OpenRgbSdkClient : IDisposable
 {
@@ -20,7 +20,6 @@ public sealed class OpenRgbSdkClient : IDisposable
     private NetworkStream? _stream;
 
     public bool IsConnected => _tcp?.Connected == true && _stream is not null;
-    public int Port => DefaultPort;
 
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
@@ -58,24 +57,17 @@ public sealed class OpenRgbSdkClient : IDisposable
         await SendPacketAsync(0, 0, Array.Empty<byte>(), cancellationToken);
         var packet = await ReadMatchingPacketAsync(0, cancellationToken);
 
-        if (packet.Payload.Length < 4)
-            throw new InvalidDataException("OpenRGB returned an invalid controller list.");
+        if (packet.Payload.Length != 4)
+            throw new InvalidDataException("OpenRGB returned an invalid controller count packet.");
 
         var count = ReadUInt32(packet.Payload, 0);
         if (count > 512)
             throw new InvalidDataException("OpenRGB reported an unexpected number of RGB controllers.");
 
-        var requiredLength = checked(4 + (int)count * 4);
-        if (packet.Payload.Length < requiredLength)
-            throw new InvalidDataException("OpenRGB returned an incomplete controller ID list.");
-
-        var ids = new uint[count];
-        for (var i = 0; i < count; i++)
-            ids[i] = ReadUInt32(packet.Payload, 4 + (i * 4));
-
         var devices = new List<OpenRgbDevice>((int)count);
-        foreach (var id in ids)
+        for (uint id = 0; id < count; id++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await SendPacketAsync(id, 1, UInt32Payload(ProtocolVersion), cancellationToken);
             var dataPacket = await ReadMatchingPacketAsync(1, cancellationToken);
             devices.Add(ParseController(id, dataPacket.Payload));
@@ -118,19 +110,36 @@ public sealed class OpenRgbSdkClient : IDisposable
 
     private static OpenRgbDevice ParseController(uint id, byte[] packetPayload)
     {
+        try
+        {
+            return ParseControllerCore(id, packetPayload, includeZoneColorOrder: false);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException or ArgumentOutOfRangeException)
+        {
+            // Some protocol-v6 builds append zone_color_order after each zone description.
+            // Retry with that field enabled instead of silently shifting later fields.
+            return ParseControllerCore(id, packetPayload, includeZoneColorOrder: true);
+        }
+    }
+
+    private static OpenRgbDevice ParseControllerCore(
+        uint id,
+        byte[] packetPayload,
+        bool includeZoneColorOrder)
+    {
         if (packetPayload.Length < 4)
             throw new InvalidDataException("OpenRGB returned an empty controller description.");
 
         var dataSize = ReadUInt32(packetPayload, 0);
-        if (dataSize > packetPayload.Length - 4)
-            throw new InvalidDataException("OpenRGB returned a truncated controller description.");
+        if (dataSize > MaximumPacketBytes || dataSize != packetPayload.Length - 4)
+            throw new InvalidDataException("OpenRGB returned a truncated or invalid controller description.");
 
         using var memory = new MemoryStream(packetPayload, 4, (int)dataSize, writable: false);
         using var reader = new BinaryReader(memory, Encoding.UTF8);
 
-        _ = reader.ReadInt32(); // controller type
+        var deviceType = reader.ReadInt32();
         var name = ReadString16(reader);
-        var vendor = ReadString16(reader); // protocol 1+
+        var vendor = ReadString16(reader);
         _ = ReadString16(reader); // description
         _ = ReadString16(reader); // version
         _ = ReadString16(reader); // serial
@@ -138,7 +147,7 @@ public sealed class OpenRgbSdkClient : IDisposable
 
         var modeCount = reader.ReadUInt16();
         if (modeCount > 2048)
-            throw new InvalidDataException("OpenRGB returned an invalid mode count.");
+            throw new InvalidDataException("OpenRGB returned an invalid controller mode count.");
         _ = reader.ReadInt32(); // active mode
         for (var i = 0; i < modeCount; i++)
             SkipMode(reader);
@@ -146,18 +155,17 @@ public sealed class OpenRgbSdkClient : IDisposable
         var zoneCount = reader.ReadUInt16();
         if (zoneCount > 2048)
             throw new InvalidDataException("OpenRGB returned an invalid zone count.");
-
         for (var i = 0; i < zoneCount; i++)
-            SkipZone(reader);
+            SkipZone(reader, includeZoneColorOrder);
 
         var ledCount = reader.ReadUInt16();
         for (var i = 0; i < ledCount; i++)
-            _ = ReadString16(reader);
+            _ = ReadString16(reader); // protocol 6 removed the internal led_value field
 
         var colorCount = reader.ReadUInt16();
         SkipBytes(reader, checked(colorCount * 4));
 
-        // Protocol 5+
+        // Protocol 5+: alternate LED display names.
         var alternateNameCount = reader.ReadUInt16();
         if (alternateNameCount > 4096)
             throw new InvalidDataException("OpenRGB returned an invalid LED display-name count.");
@@ -171,25 +179,28 @@ public sealed class OpenRgbSdkClient : IDisposable
             throw new InvalidDataException("OpenRGB returned an oversized controller configuration.");
         SkipBytes(reader, checked((int)configurationLength));
 
+        if (memory.Position != memory.Length)
+            throw new InvalidDataException("OpenRGB controller description contains unparsed fields.");
+
         if (!string.IsNullOrWhiteSpace(displayName))
             name = displayName;
 
-        return new OpenRgbDevice(id, name, vendor, ledCount, zoneCount);
+        return new OpenRgbDevice(id, name, vendor, ledCount, zoneCount, deviceType);
     }
 
     private static void SkipMode(BinaryReader reader)
     {
         _ = ReadString16(reader);
-        // Protocol 6 removes mode_value and retains eleven 32-bit fields.
+        // SDK v6 removed mode_value and therefore has eleven 32-bit mode fields.
         SkipBytes(reader, 11 * 4);
-        var colors = reader.ReadUInt16();
-        SkipBytes(reader, checked(colors * 4));
+        var colorCount = reader.ReadUInt16();
+        SkipBytes(reader, checked(colorCount * 4));
     }
 
-    private static void SkipZone(BinaryReader reader)
+    private static void SkipZone(BinaryReader reader, bool includeZoneColorOrder)
     {
         _ = ReadString16(reader);
-        _ = reader.ReadInt32(); // zone type
+        _ = reader.ReadInt32();  // zone type
         _ = reader.ReadUInt32(); // minimum LEDs
         _ = reader.ReadUInt32(); // maximum LEDs
         _ = reader.ReadUInt32(); // active LED count
@@ -222,6 +233,8 @@ public sealed class OpenRgbSdkClient : IDisposable
             SkipMode(reader);
 
         _ = ReadString16(reader); // zone display name, protocol 6
+        if (includeZoneColorOrder)
+            _ = reader.ReadUInt32(); // zone color order, protocol-v6 extensions
     }
 
     private static string ReadString16(BinaryReader reader)
@@ -229,7 +242,6 @@ public sealed class OpenRgbSdkClient : IDisposable
         var length = reader.ReadUInt16();
         if (length == 0)
             return string.Empty;
-
         if (length > 32768)
             throw new InvalidDataException("OpenRGB returned an oversized text field.");
 
@@ -280,7 +292,6 @@ public sealed class OpenRgbSdkClient : IDisposable
             if (packet.PacketId == expectedPacketId)
                 return packet;
 
-            // Ignore server name/flags, ACKs, and asynchronous detection notifications.
             if (packet.PacketId is 10 or 51 or 53 or 100 or 101 or 102 or 103)
                 continue;
 
@@ -295,13 +306,11 @@ public sealed class OpenRgbSdkClient : IDisposable
     {
         EnsureConnected();
         var header = await ReadExactlyAsync(16, cancellationToken);
-
         if (Encoding.ASCII.GetString(header, 0, 4) != "ORGB")
             throw new InvalidDataException("OpenRGB returned an invalid SDK packet header.");
 
         var packetId = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8, 4));
         var length = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(12, 4));
-
         if (length > MaximumPacketBytes)
             throw new InvalidDataException("OpenRGB returned an oversized SDK packet.");
 
@@ -316,16 +325,13 @@ public sealed class OpenRgbSdkClient : IDisposable
     {
         var bytes = new byte[length];
         var offset = 0;
-
         while (offset < length)
         {
             var read = await _stream!.ReadAsync(bytes.AsMemory(offset, length - offset), cancellationToken);
             if (read == 0)
                 throw new EndOfStreamException("OpenRGB closed the SDK connection.");
-
             offset += read;
         }
-
         return bytes;
     }
 
