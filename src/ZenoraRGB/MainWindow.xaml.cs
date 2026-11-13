@@ -23,6 +23,12 @@ public partial class MainWindow : Window
         Log("The app uses OpenRGB for vendor-independent device control.");
     }
 
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        // First-run setup and hardware detection happen automatically.
+        await ConnectAndScanAsync();
+    }
+
     private async void ConnectButton_Click(object sender, RoutedEventArgs e) =>
         await ConnectAndScanAsync();
 
