@@ -112,7 +112,8 @@ public sealed class OpenRgbSdkClient : IDisposable
                 $"OpenRGB returned an unsupported LED count for {device.Name}.");
 
         // RGBController.UpdateLEDs expects the controller to be in custom/direct mode.
-        await SendPacketAsync(device.Id, 1100, Array.Empty<byte>(), cancellationToken);
+        await SendCommandAndWaitForAckAsync(
+            device.Id, 1100, Array.Empty<byte>(), cancellationToken);
 
         using var payload = new MemoryStream();
         using (var writer = new BinaryWriter(payload, Encoding.UTF8, leaveOpen: true))
@@ -130,7 +131,8 @@ public sealed class OpenRgbSdkClient : IDisposable
             }
         }
 
-        await SendPacketAsync(device.Id, 1050, payload.ToArray(), cancellationToken);
+        await SendCommandAndWaitForAckAsync(
+            device.Id, 1050, payload.ToArray(), cancellationToken);
     }
 
     private static OpenRgbDevice ParseController(uint id, byte[] packetPayload)
@@ -265,6 +267,49 @@ public sealed class OpenRgbSdkClient : IDisposable
         var skipped = reader.ReadBytes(count);
         if (skipped.Length != count)
             throw new EndOfStreamException("OpenRGB returned a truncated controller field.");
+    }
+
+    private async Task SendCommandAndWaitForAckAsync(
+        uint deviceId,
+        uint commandPacketId,
+        byte[] payload,
+        CancellationToken cancellationToken)
+    {
+        await SendPacketAsync(deviceId, commandPacketId, payload, cancellationToken);
+
+        for (var attempt = 0; attempt < 64; attempt++)
+        {
+            var packet = await ReadPacketAsync(cancellationToken);
+
+            if (packet.PacketId == 10)
+            {
+                if (packet.Payload.Length != 8)
+                    throw new InvalidDataException("OpenRGB returned a malformed SDK acknowledgement.");
+
+                var acknowledgedPacket = ReadUInt32(packet.Payload, 0);
+                var statusCode = ReadUInt32(packet.Payload, 4);
+
+                if (statusCode != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"OpenRGB rejected packet {acknowledgedPacket} with status {statusCode}.");
+                }
+
+                if (acknowledgedPacket == commandPacketId)
+                    return;
+
+                continue;
+            }
+
+            if (packet.PacketId is 51 or 53 or 100 or 101 or 102 or 103)
+                continue;
+
+            throw new InvalidDataException(
+                $"Unexpected OpenRGB SDK packet {packet.PacketId} while waiting for ACK {commandPacketId}.");
+        }
+
+        throw new TimeoutException(
+            $"OpenRGB did not acknowledge command {commandPacketId}.");
     }
 
     private async Task SendPacketAsync(
