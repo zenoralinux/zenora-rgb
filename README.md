@@ -80,7 +80,7 @@ The result is `publish\ZenoraRGB.exe`. The GitHub Actions workflow performs thes
 
 The v0.3.0 GitHub Release includes:
 - OpenRGB 1.1 source archive (GPL-2.0-or-later).
-- PawnIO 2.2.0 source archive (GPL-2.0-or-later with the upstream device-interface exception).
+- PawnIO 2.2.0 source archive and its pinned PawnPP submodule source (GPL-2.0-or-later with the upstream device-interface exception).
 - Third-party notices and the exact package SHA-256 manifest.
 
 The PawnIO Setup repository hosts the official installer releases; the official installer states that it may be redistributed unmodified. The setup is embedded without alteration so its Authenticode signature remains intact.
