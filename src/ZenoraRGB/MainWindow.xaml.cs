@@ -88,6 +88,53 @@ public partial class MainWindow : Window
         Log("Saved MSI SDK DLL path.");
     }
 
+    private async void DownloadMsiSdkButton_Click(object sender, RoutedEventArgs e)
+    {
+        var confirmation = MessageBox.Show(
+            "Zenora RGB will download the official Mystic Light SDK package directly from MSI and extract it into your local AppData folder.\n\nThe proprietary MSI files will not be uploaded to Zenora's GitHub repository or included in the public release. MSI Center / Mystic Light must still be installed. Continue?",
+            "Download official MSI SDK",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Information);
+
+        if (confirmation != MessageBoxResult.Yes)
+            return;
+
+        DownloadMsiSdkButton.IsEnabled = false;
+        MsiStatusText.Text = "Downloading from MSI...";
+        MsiDeviceText.Text = "Fetching the official SDK package and installing it locally.";
+        Log("Downloading MSI Mystic Light SDK directly from MSI...");
+
+        try
+        {
+            var dllPath = await MsiSdkInstaller.DownloadAndExtractAsync();
+            _settings.MsiSdkPath = dllPath;
+            _settings.Save();
+            MsiSdkPathText.Text = dllPath;
+            MsiStatusText.Text = "SDK installed locally";
+            MsiDeviceText.Text = "Official MSI SDK is ready. Click Connect MSI.";
+            Log("Official MSI SDK downloaded and extracted locally.");
+        }
+        catch (Exception ex)
+        {
+            MsiStatusText.Text = "SDK download failed";
+            MsiDeviceText.Text = ex.Message;
+            Log($"MSI SDK download: {ex.Message}");
+            var result = MessageBox.Show(
+                ex.Message + "\n\nOpen MSI's official developer download page to download it manually?",
+                "MSI SDK download failed",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (result == MessageBoxResult.Yes)
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                    "https://www.msi.com/Landing/mystic-light-rgb-gaming-pc/download")
+                { UseShellExecute = true });
+        }
+        finally
+        {
+            DownloadMsiSdkButton.IsEnabled = true;
+        }
+    }
+
     private void ConnectMsiButton_Click(object sender, RoutedEventArgs e)
     {
         try

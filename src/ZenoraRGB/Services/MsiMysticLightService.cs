@@ -19,7 +19,7 @@ public sealed class MsiMysticLightService : IDisposable
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int GetDeviceInfoDelegate(
         [Out, MarshalAs(UnmanagedType.SafeArray, SafeArraySubType = VarEnum.VT_BSTR)] out string[] deviceTypes,
-        [Out, MarshalAs(UnmanagedType.SafeArray, SafeArraySubType = VarEnum.VT_BSTR)] out string[] ledCounts);
+        [Out, MarshalAs(UnmanagedType.SafeArray, SafeArraySubType = VarEnum.VT_I4)] out int[] ledCounts);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
     private delegate int SetLedColorDelegate(
@@ -77,10 +77,10 @@ public sealed class MsiMysticLightService : IDisposable
 
             for (var i = 0; i < length; i++)
             {
-                if (!uint.TryParse(ledCounts[i], out var zoneCount))
+                if (ledCounts[i] <= 0)
                     continue;
 
-                zoneCount = Math.Min(zoneCount, 256);
+                var zoneCount = (uint)Math.Min(ledCounts[i], 256);
                 for (uint zone = 0; zone < zoneCount; zone++)
                 {
                     result.Add(new RgbDevice(

@@ -138,14 +138,17 @@
                                 <StackPanel>
                                     <TextBlock Text="CONNECTION" FontSize="9" Foreground="{StaticResource MutedBrush}"/>
                                     <TextBlock x:Name="MsiStatusText" Text="SDK not selected" FontSize="13" FontWeight="SemiBold" Margin="0,5,0,0"/>
-                                    <TextBlock x:Name="MsiDeviceText" Text="Select the 64-bit SDK DLL, then connect." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                    <TextBlock x:Name="MsiDeviceText" Text="Install the official SDK once, then connect to MSI Center." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                 </StackPanel>
                             </Border>
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Select SDK DLL" Click="SelectMsiSdkButton_Click"/>
-                                <Button Content="Connect MSI" Background="#A04458" BorderBrush="#A04458" Margin="8,0,0,0" Click="ConnectMsiButton_Click"/>
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button x:Name="DownloadMsiSdkButton" Content="Download official SDK" Background="#34304F" BorderBrush="#514A77" Click="DownloadMsiSdkButton_Click"/>
+                                    <Button Content="Choose DLL" Margin="8,0,0,0" Click="SelectMsiSdkButton_Click"/>
+                                </StackPanel>
+                                <Button Content="Connect MSI" Background="#A04458" BorderBrush="#A04458" Margin="0,9,0,0" HorizontalAlignment="Left" Click="ConnectMsiButton_Click"/>
                             </StackPanel>
-                            <TextBlock Text="SDK DLL PATH" FontSize="9" Foreground="{StaticResource MutedBrush}" Margin="0,19,0,7"/>
+                            <TextBlock Text="LOCAL SDK PATH" FontSize="9" Foreground="{StaticResource MutedBrush}" Margin="0,19,0,7"/>
                             <TextBlock x:Name="MsiSdkPathText" Text="Not configured" FontSize="10" Foreground="#D4DBE8" TextWrapping="Wrap" MaxHeight="38"/>
                             <TextBlock Text="LED ZONE" FontSize="9" Foreground="{StaticResource MutedBrush}" Margin="0,13,0,7"/>
                             <ComboBox x:Name="MsiZoneCombo" DisplayMemberPath="DisplayName" Height="36"/>
