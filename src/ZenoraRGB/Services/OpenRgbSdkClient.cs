@@ -41,6 +41,10 @@ public sealed class OpenRgbSdkClient : IDisposable
                     $"OpenRGB SDK protocol {serverVersion} is too old. Zenora RGB requires protocol {ProtocolVersion}.");
 
             await SendPacketAsync(0, 50, Encoding.UTF8.GetBytes("Zenora RGB\0"), cancellationToken);
+
+            // Advertise RGBController support and request exclusive local-client status.
+            // OpenRGB only grants this flag to clients connected through localhost.
+            await SendPacketAsync(0, 52, UInt32Payload(1u | (1u << 16)), cancellationToken);
         }
         catch
         {
