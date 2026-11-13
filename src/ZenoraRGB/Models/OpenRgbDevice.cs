@@ -5,7 +5,8 @@ public sealed record OpenRgbDevice(
     string Name,
     string Vendor,
     int LedCount,
-    int ZoneCount)
+    int ZoneCount,
+    int DeviceType)
 {
     public string DisplayName => string.IsNullOrWhiteSpace(Vendor)
         ? $"{Name} · {LedCount} LEDs"
