@@ -42,16 +42,29 @@ public static class OpenRgbRuntimeInstaller
     private static string PawnIoDirectory =>
         Path.Combine(RootDirectory, $"PawnIO-{PawnIoVersion}");
 
-    public static async Task PreparePrerequisitesAsync(
+    public static async Task<string> PreparePrerequisitesAsync(
         Action<string>? report = null,
         CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(RootDirectory);
 
         await EnsureVCRedistAsync(report, cancellationToken);
-        await InstallPawnIoAsync(report, cancellationToken);
-        _ = await EnsureOpenRgbAsync(report, cancellationToken);
+
+        try
+        {
+            var installCode = await InstallPawnIoAsync(report, cancellationToken);
+            if (installCode == 3010)
+                report?.Invoke("PawnIO was installed. Restart Windows before expecting RAM/SMBus access.");
+        }
+        catch (Exception ex)
+        {
+            // Direct USB/PCIe controllers can still be scanned without PawnIO.
+            report?.Invoke($"PawnIO is unavailable: {ex.Message} Direct USB/PCIe devices will still be scanned.");
+        }
+
+        var executable = await EnsureOpenRgbAsync(report, cancellationToken);
         await ExtractThirdPartyNoticesAsync(cancellationToken);
+        return executable;
     }
 
     public static async Task<string> EnsureOpenRgbAsync(
@@ -134,6 +147,12 @@ public static class OpenRgbRuntimeInstaller
             if (exitCode is not 0 and not 3010 and not 1638)
                 throw new InvalidOperationException(
                     $"Microsoft Visual C++ runtime installation failed with exit code {exitCode}.");
+
+            if (exitCode == 1638 && !IsVCRedistInstalled())
+            {
+                throw new InvalidOperationException(
+                    "A different Visual C++ runtime installer is already running, but the required x64 runtime is not registered.");
+            }
 
             if (exitCode == 3010)
                 report?.Invoke("Microsoft Visual C++ runtime was installed; Windows requested a restart.");
