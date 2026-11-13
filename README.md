@@ -7,7 +7,7 @@ Zenora RGB is a Windows x64 desktop app that controls compatible RGB hardware th
 - One unified OpenRGB engine for supported ASUS, MSI, Corsair and other RGB controllers.
 - No Armoury Crate, ASUS Aura app, MSI Center, or Mystic Light installation is required.
 - First-run setup downloads OpenRGB 1.1 from the separate Zenora GitHub runtime release, verifies its SHA-256, and extracts it automatically.
-- When Windows hardware access requires PawnIO, the app downloads the signed setup from the official PawnIO GitHub release, verifies its SHA-256, and runs the installer silently.
+- When Windows hardware access requires PawnIO, the app downloads the setup from the official PawnIO GitHub release, verifies its SHA-256, and runs the installer silently.
 - Local OpenRGB SDK server is bound to 127.0.0.1 only; the app does not expose the control port to the network.
 - One HEX palette, presets, selected-device and all-device color application.
 - Self-contained .NET runtime. No separate .NET installation is required.
