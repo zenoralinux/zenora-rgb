@@ -21,7 +21,7 @@
   </ItemGroup>
   <ItemGroup Condition="'$(PawnIoInstallerPath)' != '' and Exists('$(PawnIoInstallerPath)')">
     <EmbeddedResource Include="$(PawnIoInstallerPath)"
-                      LogicalName="ZenoraRGB.Resources.PAWNIO_setup.exe" />
+                      LogicalName="ZenoraRGB.Resources.PawnIO_setup.exe" />
   </ItemGroup>
   <ItemGroup Condition="'$(VcRedistPath)' != '' and Exists('$(VcRedistPath)')">
     <EmbeddedResource Include="$(VcRedistPath)"
