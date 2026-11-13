@@ -41,18 +41,19 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create or refresh v0.1.0 Release from main
+      - name: Create or refresh v0.2.0 Release from main
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = "v0.1.0"
+          $ErrorActionPreference = "Stop"
+          $tag = "v0.2.0"
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag "./publish/ZenoraRGB.exe" --repo "$env:GITHUB_REPOSITORY" --clobber
           } else {
-            gh release create $tag "./publish/ZenoraRGB.exe" --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "Zenora RGB v0.1.0" --notes "Initial Windows x64 prototype. Vendor SDKs are downloaded from ASUS/MSI on the user's PC and are not redistributed in this release."
+            gh release create $tag "./publish/ZenoraRGB.exe" --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "Zenora RGB v0.2.0" --notes "Unified OpenRGB-based Windows RGB control. No Armoury Crate or MSI Center is required. The app downloads a SHA-256 verified OpenRGB runtime from the Zenora GitHub Release and checks/installs PawnIO from its official upstream release when needed. Administrator approval is required for hardware-driver installation."
           }
           if ($LASTEXITCODE -ne 0) {
             throw "GitHub Release publishing failed."
