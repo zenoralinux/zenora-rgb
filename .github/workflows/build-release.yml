@@ -1,4 +1,4 @@
-name: Build Windows app
+name: Build Windows single-file release
 
 on:
   push:
@@ -13,9 +13,14 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: zenora-rgb-build-\${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,66 +30,85 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Publish self-contained single-file EXE
+      - name: Download and verify all embedded prerequisites
         shell: pwsh
         run: |
-          dotnet publish ./src/ZenoraRGB/ZenoraRGB.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false --output ./publish
+          $ErrorActionPreference = "Stop"
+          ./scripts/Prepare-Bundle.ps1 -BundleDirectory "$PWD/bundle" -SourceDirectory "$PWD/third-party-sources"
+
+      - name: Publish self-contained EXE with embedded prerequisites
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $bundle = Join-Path $PWD "bundle"
+          dotnet publish ./src/ZenoraRGB/ZenoraRGB.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:RequireBundledPrerequisites=true "-p:OpenRgbRuntimePath=$bundle/OpenRGB_1.1_Windows_64_8e16de2.zip" "-p:PawnIoInstallerPath=$bundle/PawnIO_setup.exe" "-p:VcRedistPath=$bundle/vc_redist.x64.exe" "-p:ThirdPartyNoticesPath=$bundle/THIRD-PARTY-NOTICES.txt" --output ./publish
+
           if (!(Test-Path ./publish/ZenoraRGB.exe)) {
             throw "ZenoraRGB.exe was not produced."
           }
 
+          $exe = Get-Item ./publish/ZenoraRGB.exe
+          Write-Host "Single-file EXE size: $([Math]::Round($exe.Length / 1MB, 1)) MB"
+          Get-FileHash ./publish/ZenoraRGB.exe -Algorithm SHA256
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ZenoraRGB-win-x64
+          name: ZenoraRGB-win-x64-fully-embedded
           path: ./publish/ZenoraRGB.exe
           if-no-files-found: error
           retention-days: 30
 
-      - name: Wait for OpenRGB runtime release
+      - name: Create or refresh v0.3.0 fully embedded Release
         if: github.ref == 'refs/heads/main'
-        shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: \${{ github.token }}
+        shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $false
-          $ready = $false
-          for ($attempt = 1; $attempt -le 60; $attempt++) {
-            $assets = gh release view "runtime-v1.1" --repo "$env:GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>$null
-            if ($LASTEXITCODE -eq 0 -and $assets -contains "OpenRGB_1.1_Windows_64_8e16de2.zip") {
-              $ready = $true
-              break
-            }
-            Start-Sleep -Seconds 10
-          }
-          if (-not $ready) {
-            throw "OpenRGB runtime-v1.1 release is not ready. The app release has been stopped."
-          }
+          $tag = "v0.3.0"
+          $assets = @(
+            "./publish/ZenoraRGB.exe",
+            "./third-party-sources/OpenRGB-1.1-source.zip",
+            "./third-party-sources/PawnIO-2.2.0-source.zip",
+            "./bundle/THIRD-PARTY-NOTICES.txt",
+            "./bundle/BUNDLE-MANIFEST.txt"
+          )
 
-      - name: Create or refresh v0.2.0 Release from main
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $false
-          $tag = "v0.2.0"
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag "./publish/ZenoraRGB.exe" --repo "$env:GITHUB_REPOSITORY" --clobber
+            gh release upload $tag $assets --repo "$env:GITHUB_REPOSITORY" --clobber
           } else {
-            gh release create $tag "./publish/ZenoraRGB.exe" --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "Zenora RGB v0.2.0" --notes "Unified OpenRGB-based Windows RGB control. No Armoury Crate or MSI Center is required. The app downloads a SHA-256 verified OpenRGB runtime from the Zenora GitHub Release and checks/installs PawnIO from its official upstream release when needed. Administrator approval is required for hardware-driver installation."
-          }
-          if ($LASTEXITCODE -ne 0) {
-            throw "GitHub Release publishing failed."
+            gh release create $tag $assets --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "Zenora RGB v0.3.0 - Fully Embedded" --notes "One self-contained Windows x64 EXE. OpenRGB 1.1, the official signed PawnIO 2.2.0 installer, Microsoft Visual C++ v14 x64 Redistributable and the .NET 10 runtime are embedded in the application. No runtime downloads are performed on the user's PC. Native components are extracted to LocalAppData on first start; the PawnIO driver is installed through its official installer. Windows UAC approval and a possible restart are required. This release includes the corresponding OpenRGB and PawnIO source archives and third-party notices."
           }
 
-      - name: Create versioned Release from tag
+          if ($LASTEXITCODE -ne 0) {
+            throw "Publishing the v0.3.0 GitHub Release failed."
+          }
+
+      - name: Create or refresh versioned Release from tag
         if: startsWith(github.ref, 'refs/tags/v')
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: \${{ github.token }}
         shell: pwsh
         run: |
-          gh release create "$env:GITHUB_REF_NAME" "./publish/ZenoraRGB.exe" --repo "$env:GITHUB_REPOSITORY" --title "Zenora RGB $env:GITHUB_REF_NAME" --generate-notes
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $tag = "$env:GITHUB_REF_NAME"
+          $assets = @(
+            "./publish/ZenoraRGB.exe",
+            "./third-party-sources/OpenRGB-1.1-source.zip",
+            "./third-party-sources/PawnIO-2.2.0-source.zip",
+            "./bundle/THIRD-PARTY-NOTICES.txt",
+            "./bundle/BUNDLE-MANIFEST.txt"
+          )
+          gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $assets --repo "$env:GITHUB_REPOSITORY" --clobber
+          } else {
+            gh release create $tag $assets --repo "$env:GITHUB_REPOSITORY" --title "Zenora RGB $tag" --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Publishing the versioned GitHub Release failed."
+          }
