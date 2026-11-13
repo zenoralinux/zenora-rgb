@@ -72,6 +72,7 @@ jobs:
             "./publish/ZenoraRGB.exe",
             "./third-party-sources/OpenRGB-1.1-source.zip",
             "./third-party-sources/PawnIO-2.2.0-source.zip",
+            "./third-party-sources/PawnPP-e64e4c37-source.zip",
             "./bundle/THIRD-PARTY-NOTICES.txt",
             "./bundle/BUNDLE-MANIFEST.txt"
           )
