@@ -20,6 +20,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $false
           $runtimeUrl = "https://codeberg.org/OpenRGB/OpenRGB/releases/download/release_1.1/OpenRGB_1.1_Windows_64_8e16de2.zip"
           $expectedHash = "63291726C6FC84EB479EF2EE752E97E1187F6CE9C49FD27EEE40DED588A8172A"
           $runtime = Join-Path $PWD "OpenRGB_1.1_Windows_64_8e16de2.zip"
@@ -34,24 +35,24 @@ jobs:
           $source = Join-Path $PWD "OpenRGB-1.1-source.zip"
           Invoke-WebRequest -Uri $sourceUrl -OutFile $source
 
-          $notices = @"
-Third-party runtime bundled for Zenora RGB
-===========================================
-
-OpenRGB 1.1 Windows x64 portable build
-Upstream: https://codeberg.org/OpenRGB/OpenRGB
-Release: https://codeberg.org/OpenRGB/OpenRGB/releases/tag/release_1.1
-License: GNU General Public License version 2 or later (GPL-2.0-or-later)
-Source code: OpenRGB-1.1-source.zip is provided in this same release.
-SHA-256: $expectedHash
-
-Zenora RGB downloads this unmodified upstream archive and verifies the
-SHA-256 before extraction. OpenRGB is a separate open-source project.
-
-PawnIO is not redistributed by Zenora RGB. When needed, the app downloads
-the installer from its upstream release and verifies its SHA-256:
-https://github.com/namazso/PawnIO.Setup/releases/tag/2.2.0
-"@
+          $notices = @(
+            "Third-party runtime bundled for Zenora RGB",
+            "===========================================",
+            "",
+            "OpenRGB 1.1 Windows x64 portable build",
+            "Upstream: https://codeberg.org/OpenRGB/OpenRGB",
+            "Release: https://codeberg.org/OpenRGB/OpenRGB/releases/tag/release_1.1",
+            "License: GPL-2.0-or-later",
+            "Corresponding source: OpenRGB-1.1-source.zip in this release.",
+            "SHA-256: $expectedHash",
+            "",
+            "Zenora RGB downloads this unmodified upstream archive and verifies",
+            "the SHA-256 before extraction. OpenRGB is a separate open-source project.",
+            "",
+            "PawnIO is not redistributed by Zenora RGB. When needed, the app downloads",
+            "the installer from its upstream release and verifies its SHA-256:",
+            "https://github.com/namazso/PawnIO.Setup/releases/tag/2.2.0"
+          )
           Set-Content -Path (Join-Path $PWD "THIRD-PARTY-NOTICES.txt") -Value $notices -Encoding utf8
 
       - name: Create or refresh runtime release
@@ -60,6 +61,7 @@ https://github.com/namazso/PawnIO.Setup/releases/tag/2.2.0
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $false
           $tag = "runtime-v1.1"
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
