@@ -66,8 +66,10 @@ finally {
 # Attach corresponding upstream source archives to the GitHub Release.
 $openRgbSource = Join-Path $sources "OpenRGB-1.1-source.zip"
 $pawnIoSource = Join-Path $sources "PawnIO-2.2.0-source.zip"
+$pawnPpSource = Join-Path $sources "PawnPP-e64e4c37-source.zip"
 Invoke-WebRequest -Uri "https://codeberg.org/OpenRGB/OpenRGB/archive/release_1.1.zip" -OutFile $openRgbSource
 Invoke-WebRequest -Uri "https://github.com/namazso/PawnIO/archive/refs/tags/2.2.0.zip" -OutFile $pawnIoSource
+Invoke-WebRequest -Uri "https://github.com/namazso/PawnPP/archive/e64e4c37b2d8ba0d8ee57205faf8183aee12c438.zip" -OutFile $pawnPpSource
 
 $noticeLines = @(
     "ZENORA RGB - THIRD-PARTY COMPONENTS",
@@ -89,6 +91,7 @@ $noticeLines = @(
     "The installer states: This installer can be redistributed unmodified.",
     "The driver is GPL-2.0-or-later with the upstream device-interface exception.",
     "Corresponding source: PawnIO-2.2.0-source.zip in this GitHub Release.",
+    "Pinned PawnPP submodule source: PawnPP-e64e4c37-source.zip (commit e64e4c37b2d8ba0d8ee57205faf8183aee12c438).",
     "",
     "Microsoft Visual C++ v14 x64 Redistributable",
     "Version: $vcVersion",
@@ -124,7 +127,8 @@ $manifest = Join-Path $bundle "BUNDLE-MANIFEST.txt"
     "PawnIO_setup.exe  $((Get-FileHash $pawnIo -Algorithm SHA256).Hash)",
     "vc_redist.x64.exe  $vcHash",
     "OpenRGB-1.1-source.zip  $((Get-FileHash $openRgbSource -Algorithm SHA256).Hash)",
-    "PawnIO-2.2.0-source.zip  $((Get-FileHash $pawnIoSource -Algorithm SHA256).Hash)"
+    "PawnIO-2.2.0-source.zip  $((Get-FileHash $pawnIoSource -Algorithm SHA256).Hash)",
+    "PawnPP-e64e4c37-source.zip  $((Get-FileHash $pawnPpSource -Algorithm SHA256).Hash)"
 ) | Set-Content -LiteralPath $manifest -Encoding utf8
 
 Write-Host "Embedded prerequisites prepared:"
