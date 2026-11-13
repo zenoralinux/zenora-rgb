@@ -45,6 +45,13 @@ public sealed class OpenRgbSdkClient : IDisposable
             // Advertise RGBController support and request exclusive local-client status.
             // OpenRGB only grants this flag to clients connected through localhost.
             await SendPacketAsync(0, 52, UInt32Payload(1u | (1u << 16)), cancellationToken);
+            var serverFlags = await ReadMatchingPacketAsync(53, cancellationToken);
+            if (serverFlags.Payload.Length != sizeof(uint) ||
+                (ReadUInt32(serverFlags.Payload, 0) & (1u << 16)) == 0)
+            {
+                throw new InvalidOperationException(
+                    "OpenRGB did not grant local controller access. Make sure the SDK server is bound to 127.0.0.1.");
+            }
         }
         catch
         {
