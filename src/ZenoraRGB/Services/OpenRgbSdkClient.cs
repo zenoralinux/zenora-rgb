@@ -13,7 +13,7 @@ namespace ZenoraRGB.Services;
 public sealed class OpenRgbSdkClient : IDisposable
 {
     private const uint ProtocolVersion = 6;
-    private const int DefaultPort = 6749;
+    private const int DefaultPort = 6742;
     private const int MaximumPacketBytes = 64 * 1024 * 1024;
 
     private TcpClient? _tcp;
@@ -57,20 +57,31 @@ public sealed class OpenRgbSdkClient : IDisposable
         await SendPacketAsync(0, 0, Array.Empty<byte>(), cancellationToken);
         var packet = await ReadMatchingPacketAsync(0, cancellationToken);
 
-        if (packet.Payload.Length != 4)
+        if (packet.Payload.Length < 4)
             throw new InvalidDataException("OpenRGB returned an invalid controller count packet.");
 
         var count = ReadUInt32(packet.Payload, 0);
         if (count > 512)
             throw new InvalidDataException("OpenRGB reported an unexpected number of RGB controllers.");
 
-        var devices = new List<OpenRgbDevice>((int)count);
-        for (uint id = 0; id < count; id++)
+        var controllerCount = checked((int)count);
+        var expectedLength = checked(4 + controllerCount * sizeof(uint));
+        if (packet.Payload.Length != expectedLength)
+            throw new InvalidDataException(
+                $"OpenRGB protocol v6 returned {packet.Payload.Length} bytes for {controllerCount} controllers; expected {expectedLength}.");
+
+        // Protocol v6 uses stable unique controller IDs, not zero-based list indexes.
+        var controllerIds = new uint[controllerCount];
+        for (var i = 0; i < controllerCount; i++)
+            controllerIds[i] = ReadUInt32(packet.Payload, 4 + (i * sizeof(uint)));
+
+        var devices = new List<OpenRgbDevice>(controllerCount);
+        foreach (var controllerId in controllerIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await SendPacketAsync(id, 1, UInt32Payload(ProtocolVersion), cancellationToken);
+            await SendPacketAsync(controllerId, 1, UInt32Payload(ProtocolVersion), cancellationToken);
             var dataPacket = await ReadMatchingPacketAsync(1, cancellationToken);
-            devices.Add(ParseController(id, dataPacket.Payload));
+            devices.Add(ParseController(controllerId, dataPacket.Payload));
         }
 
         return devices;
@@ -110,23 +121,6 @@ public sealed class OpenRgbSdkClient : IDisposable
 
     private static OpenRgbDevice ParseController(uint id, byte[] packetPayload)
     {
-        try
-        {
-            return ParseControllerCore(id, packetPayload, includeZoneColorOrder: false);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException or ArgumentOutOfRangeException)
-        {
-            // Some protocol-v6 builds append zone_color_order after each zone description.
-            // Retry with that field enabled instead of silently shifting later fields.
-            return ParseControllerCore(id, packetPayload, includeZoneColorOrder: true);
-        }
-    }
-
-    private static OpenRgbDevice ParseControllerCore(
-        uint id,
-        byte[] packetPayload,
-        bool includeZoneColorOrder)
-    {
         if (packetPayload.Length < 4)
             throw new InvalidDataException("OpenRGB returned an empty controller description.");
 
@@ -156,7 +150,7 @@ public sealed class OpenRgbSdkClient : IDisposable
         if (zoneCount > 2048)
             throw new InvalidDataException("OpenRGB returned an invalid zone count.");
         for (var i = 0; i < zoneCount; i++)
-            SkipZone(reader, includeZoneColorOrder);
+            SkipZone(reader);
 
         var ledCount = reader.ReadUInt16();
         for (var i = 0; i < ledCount; i++)
@@ -165,14 +159,13 @@ public sealed class OpenRgbSdkClient : IDisposable
         var colorCount = reader.ReadUInt16();
         SkipBytes(reader, checked(colorCount * 4));
 
-        // Protocol 5+: alternate LED display names.
-        var alternateNameCount = reader.ReadUInt16();
+        var alternateNameCount = reader.ReadUInt16(); // protocol 5
         if (alternateNameCount > 4096)
             throw new InvalidDataException("OpenRGB returned an invalid LED display-name count.");
         for (var i = 0; i < alternateNameCount; i++)
             _ = ReadString16(reader);
 
-        _ = reader.ReadUInt32(); // controller flags
+        _ = reader.ReadUInt32(); // controller flags, protocol 5
         var displayName = ReadString16(reader); // protocol 6
         var configurationLength = reader.ReadUInt32();
         if (configurationLength > 1024 * 1024)
@@ -197,7 +190,7 @@ public sealed class OpenRgbSdkClient : IDisposable
         SkipBytes(reader, checked(colorCount * 4));
     }
 
-    private static void SkipZone(BinaryReader reader, bool includeZoneColorOrder)
+    private static void SkipZone(BinaryReader reader)
     {
         _ = ReadString16(reader);
         _ = reader.ReadInt32();  // zone type
@@ -233,8 +226,6 @@ public sealed class OpenRgbSdkClient : IDisposable
             SkipMode(reader);
 
         _ = ReadString16(reader); // zone display name, protocol 6
-        if (includeZoneColorOrder)
-            _ = reader.ReadUInt32(); // zone color order, protocol-v6 extensions
     }
 
     private static string ReadString16(BinaryReader reader)
